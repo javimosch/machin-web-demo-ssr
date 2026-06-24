@@ -1,0 +1,17 @@
+// view.src — the shared component logic. This EXACT source is compiled into two
+// places: the native SSR server (server.src) and the wasm client (client.src).
+// One component model, two runtimes — server-rendered HTML and an in-browser SPA
+// from the same MFL. (It's the same view()/fib() as machin-demo-wasm.)
+
+func fib(n) (r) {
+    if n < 2 { r = n } else { r = fib(n - 1) + fib(n - 2) }
+}
+
+// view renders the counter's inner markup for a given count. Pure: an int in, an
+// HTML fragment out — identical whether it runs on the server or in the browser.
+func view(n) (s) {
+    s = "<h1>machin · isomorphic counter</h1>"
+    s = s + "<div class=big>" + str(n) + "</div>"
+    s = s + "<p>n squared = <b>" + str(n * n) + "</b></p>"
+    s = s + "<p>fib(n) = <b>" + str(fib(n)) + "</b></p>"
+}

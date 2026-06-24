@@ -1,0 +1,53 @@
+// server.src — the SSR half: a native machin HTTP server (machweb) that renders
+// the shared view() to a full HTML page on every request. No Node, no bundler,
+// no JavaScript: a single static binary serves fully-formed HTML, and the +/-
+// controls are plain links (server round-trips) — progressive enhancement at its
+// most basic. The page also pulls in the wasm client (built from the SAME
+// view.src) so, where served alongside app.wasm, it hydrates into an instant SPA.
+
+// qn extracts the ?n= query parameter from a request path, defaulting to 0.
+// Stops at an & so extra params don't bleed in.
+func qn(path) (n) {
+    n = 0
+    i := index(path, "n=")
+    if i >= 0 {
+        rest := substr(path, i + 2, len(path))
+        amp := index(rest, "&")
+        if amp >= 0 { rest = substr(rest, 0, amp) }
+        if rest != "" { n = parse_int(rest) }
+    }
+}
+
+func styles() (s) {
+    s = "<style>:root{color-scheme:dark}body{margin:0;min-height:100vh;display:grid;place-items:center;"
+    s = s + "font:16px/1.5 system-ui,sans-serif;color:#e6e6f0;background:radial-gradient(120% 120% at 50% 0%,#13201b 0%,#080a0a 60%)}"
+    s = s + ".card{width:min(420px,90vw);padding:28px 32px 32px;border-radius:16px;background:#0f1a16;border:1px solid #224536;box-shadow:0 20px 60px -20px #000}"
+    s = s + "#app h1{margin:0 0 4px;font-size:18px;color:#5ad0a0;letter-spacing:.3px}"
+    s = s + "#app .big{font-size:72px;font-weight:800;line-height:1;margin:10px 0 6px;background:linear-gradient(90deg,#66ffd0,#8bffb0);-webkit-background-clip:text;background-clip:text;color:transparent}"
+    s = s + "#app p{margin:2px 0;color:#b3d0c4}#app b{color:#e6e6f0}"
+    s = s + ".row{display:flex;gap:10px;margin-top:22px}.row a{flex:1;text-align:center;text-decoration:none;padding:12px 0;font-size:18px;font-weight:700;"
+    s = s + "border-radius:10px;border:1px solid #2c6648;background:#183a2a;color:#e6e6f0}.row a:hover{background:#205038}"
+    s = s + ".tag{margin-top:18px;font-size:12px;color:#679a85;text-align:center}code{color:#5ad0a0}</style>"
+}
+
+// page wraps the shared view() in a full HTML document with server-rendered
+// navigation links (no JS required to use it).
+func page(n) (s) {
+    s = "<!doctype html><html lang=en><head><meta charset=utf-8>"
+    s = s + "<meta name=viewport content=\"width=device-width,initial-scale=1\">"
+    s = s + "<title>machin · SSR</title>" + styles() + "</head><body><main class=card>"
+    s = s + "<div id=app>" + view(n) + "</div>"
+    s = s + "<div class=row>"
+    s = s + "<a href=\"/?n=" + str(n - 1) + "\">&minus; 1</a>"
+    s = s + "<a href=\"/?n=" + str(n + 1) + "\">+ 1</a>"
+    s = s + "<a href=\"/?n=" + str(n + 5) + "\">+ 5</a>"
+    s = s + "</div>"
+    s = s + "<p class=tag>rendered server-side by a native machin binary · <code>view()</code> shared with the wasm client</p>"
+    s = s + "</main></body></html>"
+}
+
+func main() {
+    serve(48090, func(req) {
+        return ok_html(page(qn(req.path)))
+    })
+}

@@ -1,0 +1,16 @@
+// client.src — the SPA half: the wasm client, compiled from the SAME view.src as
+// the server. `export func render(n)` is a wasm export the page calls on a click;
+// it rebuilds the markup with the shared view() and pushes it to the DOM through
+// the `set_html` import. Because view() is identical, the client re-render is
+// byte-for-byte the server's HTML — true isomorphism.
+//
+//   machin encode view.src client.src > client.mfl
+//   machin build client.mfl --target wasm -o app.wasm
+
+extern "env" {
+    fn set_html(string)
+}
+
+export func render(n) {
+    set_html(view(n))
+}
