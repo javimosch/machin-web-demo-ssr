@@ -30,24 +30,46 @@ func styles() (s) {
     s = s + ".tag{margin-top:18px;font-size:12px;color:#679a85;text-align:center}code{color:#5ad0a0}</style>"
 }
 
-// page wraps the shared view() in a full HTML document with server-rendered
-// navigation links (no JS required to use it).
+// hydration is the progressive-enhancement script: it fetches /app.wasm (served
+// by THIS binary) and, once loaded, turns the +/- links into instant in-browser
+// re-renders through the SAME view() — no round-trip, identical markup. With JS
+// off, the links still navigate server-side, so the page works either way.
+func hydration() (s) {
+    s = "<script type=module>"
+    s = s + "let count=new URLSearchParams(location.search).get('n')|0;"
+    s = s + "let mem;const dec=new TextDecoder();"
+    s = s + "const cstr=p=>{const b=new Uint8Array(mem.buffer);let e=p;while(b[e])e++;return dec.decode(b.subarray(p,e));};"
+    s = s + "const app=document.getElementById('app');"
+    s = s + "try{const{instance}=await WebAssembly.instantiateStreaming(fetch('/app.wasm'),{env:{set_html:p=>app.innerHTML=cstr(p)}});"
+    s = s + "mem=instance.exports.memory;instance.exports._initialize();"
+    s = s + "const render=()=>instance.exports.render(BigInt(count));"
+    s = s + "for(const a of document.querySelectorAll('.row a')){a.addEventListener('click',e=>{e.preventDefault();count+=a.dataset.d|0;history.replaceState(0,'','/?n='+count);render();});}"
+    s = s + "render();}catch(e){}"
+    s = s + "</script>"
+}
+
+// page wraps the shared view() in a full HTML document. The +/- controls are
+// server-rendered links (work with no JS); the hydration script upgrades them to
+// an instant SPA once the wasm — served by this same binary — loads.
 func page(n) (s) {
     s = "<!doctype html><html lang=en><head><meta charset=utf-8>"
     s = s + "<meta name=viewport content=\"width=device-width,initial-scale=1\">"
     s = s + "<title>machin · SSR</title>" + styles() + "</head><body><main class=card>"
     s = s + "<div id=app>" + view(n) + "</div>"
     s = s + "<div class=row>"
-    s = s + "<a href=\"/?n=" + str(n - 1) + "\">&minus; 1</a>"
-    s = s + "<a href=\"/?n=" + str(n + 1) + "\">+ 1</a>"
-    s = s + "<a href=\"/?n=" + str(n + 5) + "\">+ 5</a>"
+    s = s + "<a href=\"/?n=" + str(n - 1) + "\" data-d=\"-1\">&minus; 1</a>"
+    s = s + "<a href=\"/?n=" + str(n + 1) + "\" data-d=\"1\">+ 1</a>"
+    s = s + "<a href=\"/?n=" + str(n + 5) + "\" data-d=\"5\">+ 5</a>"
     s = s + "</div>"
-    s = s + "<p class=tag>rendered server-side by a native machin binary · <code>view()</code> shared with the wasm client</p>"
-    s = s + "</main></body></html>"
+    s = s + "<p class=tag>SSR by a native machin binary that serves its own <code>.wasm</code> · <code>view()</code> shared with the client</p>"
+    s = s + "</main>" + hydration() + "</body></html>"
 }
 
 func main() {
     serve(48090, func(req) {
+        if req.path == "/app.wasm" {
+            return ok_wasm(read_file_bytes("app.wasm"))   // one binary serves its own SPA bundle
+        }
         return ok_html(page(qn(req.path)))
     })
 }

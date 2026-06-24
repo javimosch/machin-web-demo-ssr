@@ -1,7 +1,7 @@
 // view.src — the shared component logic. This EXACT source is compiled into two
 // places: the native SSR server (server.src) and the wasm client (client.src).
 // One component model, two runtimes — server-rendered HTML and an in-browser SPA
-// from the same MFL. (It's the same view()/fib() as machin-demo-wasm.)
+// from the same MFL. (It's the same view()/fib() as machin-web-demo-wasm.)
 
 func fib(n) (r) {
     if n < 2 { r = n } else { r = fib(n - 1) + fib(n - 2) }

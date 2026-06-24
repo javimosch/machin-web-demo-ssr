@@ -1,4 +1,4 @@
-# machin-demo-ssr — isomorphic **server-side rendering** in machin
+# machin-web-demo-ssr — isomorphic **server-side rendering** in machin
 
 A counter page rendered **server-side by a single native machin binary** — no
 Node, no bundler, no JavaScript required to use it. The catch that makes it
@@ -10,6 +10,11 @@ compiled into both halves of the app:
 
 **One component model, two runtimes.** The server's HTML and the client's
 re-render are byte-for-byte identical, because they call the same `view()`.
+
+And it's **one binary**: the same native server **serves its own `app.wasm`**
+(machin v0.51.0's binary HTTP bodies), so the page **hydrates** into an instant
+SPA with no separate static host — first paint from the server, interactivity
+from the wasm, all shipped by one executable.
 
 ![screenshot](screenshot.png)
 
@@ -53,32 +58,45 @@ round-trip and produces the exact markup the server sent.
 
 ## Build & run
 
-Needs `machin` (**v0.50.0+** for the wasm client) and — for the client only —
-[`zig`](https://ziglang.org).
+Needs `machin` (**v0.51.0+** — the server serves binary via `read_file_bytes` +
+`ok_wasm`) and [`zig`](https://ziglang.org) (the C→wasm compiler).
 
 ```sh
-./build.sh                       # → ./machin-demo-ssr   (the SSR server)
-./machin-demo-ssr                # serves http://localhost:48090/
-# open http://localhost:48090/  ·  the − / + links navigate server-side
-
-./build.sh client                # also builds ./app.wasm from the same view.src
+./build.sh                       # builds app.wasm AND ./machin-web-demo-ssr
+./machin-web-demo-ssr            # serves http://localhost:48090/  (HTML + its own /app.wasm)
+# open http://localhost:48090/  ·  works with JS off (links navigate server-side),
+#                                   and hydrates to an instant SPA when JS is on
 ```
 
-Confirm the isomorphism — the server and the wasm client emit the same HTML:
+Confirm both halves — the server and the wasm client emit the same HTML, and the
+binary serves its own wasm:
 
 ```sh
-curl -s 'http://localhost:48090/?n=7'   # ...<div class=big>7</div>...fib(n) = <b>13</b>...
-# client render(7) via app.wasm produces that identical fragment
+curl -s 'http://localhost:48090/?n=7'              # ...<div class=big>7</div>...fib(n) = <b>13</b>...
+curl -sI 'http://localhost:48090/app.wasm'         # Content-Type: application/wasm
+# the served bytes are byte-identical to ./app.wasm, and client render(7) gives the same fragment
+```
+
+## How the single binary serves its wasm
+
+machin v0.51.0 added **binary HTTP bodies** so a string body's NUL bytes can't
+truncate a `.wasm`: `read_file_bytes(path) -> bytes` (NUL-safe read) and
+`write_bytes(fd, bytes)` (exact write), with machweb builders `ok_bytes(ctype, b)`
+/ `ok_wasm(b)`. The server's handler is just:
+
+```go
+if req.path == "/app.wasm" {
+    return ok_wasm(read_file_bytes("app.wasm"))
+}
+return ok_html(page(qn(req.path)))
 ```
 
 ## What's next
 
-Today the page hydrates only where `app.wasm` is served alongside it. Having the
-**machin server serve its own wasm** (and assets) wants a machweb **bytes-body
-response** (a `.wasm` has NUL bytes that a C-string body would truncate) — the
-next gap to drive, toward a single binary that ships both the SSR HTML and the
-SPA bundle. See the
-[web north star](https://github.com/javimosch/machin/blob/main/docs/NORTH-STAR-WEB.md).
+The component still keeps no state of its own (the count lives in the URL / the
+JS host). The next steps toward a real **reactive framework in MFL**: package-level
+state so a component owns its state in machin, then signals + a patch-list runtime.
+See the [web north star](https://github.com/javimosch/machin/blob/main/docs/NORTH-STAR-WEB.md).
 
 ## License
 
