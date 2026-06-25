@@ -1,8 +1,8 @@
-// client.src — the SPA half: the wasm client, compiled from the SAME view.src as
-// the server. `export func render(n)` is a wasm export the page calls on a click;
-// it rebuilds the markup with the shared view() and pushes it to the DOM through
-// the `set_html` import. Because view() is identical, the client re-render is
-// byte-for-byte the server's HTML — true isomorphism.
+// client.src — the SPA half, compiled from the SAME view.src as the server. The
+// interaction state (the count) lives HERE, in a machin package global (v0.52.0):
+// on hydration the page seeds it with the server-rendered count, then each click
+// mutates the global and repaints — the component owns its own state, and the
+// markup stays byte-identical to the server because both call the shared view().
 //
 //   machin encode view.src client.src > client.mfl
 //   machin build client.mfl --target wasm -o app.wasm
@@ -11,6 +11,9 @@ extern "env" {
     fn set_html(string)
 }
 
-export func render(n) {
-    set_html(view(n))
-}
+var count = 0
+
+func paint() { set_html(view(count)) }
+
+export func seed(n)     { count = n }                              // adopt the server's count (no repaint; DOM already correct)
+export func bump(d) (n) { count = count + d  paint()  n = count }  // mutate + repaint, return the new count

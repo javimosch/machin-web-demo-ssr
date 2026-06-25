@@ -32,19 +32,20 @@ func styles() (s) {
 
 // hydration is the progressive-enhancement script: it fetches /app.wasm (served
 // by THIS binary) and, once loaded, turns the +/- links into instant in-browser
-// re-renders through the SAME view() — no round-trip, identical markup. With JS
-// off, the links still navigate server-side, so the page works either way.
+// re-renders through the SAME view() — no round-trip, identical markup. The count
+// lives in the wasm module (a machin global): the page only SEEDS it with the
+// server's count, then forwards clicks to bump(). With JS off, the links still
+// navigate server-side, so the page works either way.
 func hydration() (s) {
     s = "<script type=module>"
-    s = s + "let count=new URLSearchParams(location.search).get('n')|0;"
     s = s + "let mem;const dec=new TextDecoder();"
     s = s + "const cstr=p=>{const b=new Uint8Array(mem.buffer);let e=p;while(b[e])e++;return dec.decode(b.subarray(p,e));};"
     s = s + "const app=document.getElementById('app');"
     s = s + "try{const{instance}=await WebAssembly.instantiateStreaming(fetch('/app.wasm'),{env:{set_html:p=>app.innerHTML=cstr(p)}});"
     s = s + "mem=instance.exports.memory;instance.exports._initialize();"
-    s = s + "const render=()=>instance.exports.render(BigInt(count));"
-    s = s + "for(const a of document.querySelectorAll('.row a')){a.addEventListener('click',e=>{e.preventDefault();count+=a.dataset.d|0;history.replaceState(0,'','/?n='+count);render();});}"
-    s = s + "render();}catch(e){}"
+    s = s + "instance.exports.seed(BigInt(new URLSearchParams(location.search).get('n')|0));"   // adopt the server-rendered count
+    s = s + "for(const a of document.querySelectorAll('.row a')){a.addEventListener('click',e=>{e.preventDefault();const n=Number(instance.exports.bump(BigInt(a.dataset.d|0)));history.replaceState(0,'','/?n='+n);});}"
+    s = s + "}catch(e){}"
     s = s + "</script>"
 }
 

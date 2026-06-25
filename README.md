@@ -40,9 +40,11 @@ handler reads `?n=` and returns `ok_html(page(n))`, where `page()` wraps the
 shared `view()` in a document whose +/− controls are plain `<a href="/?n=…">`
 links — navigation is a server round-trip, so it works with JavaScript off.
 
-**Client** (`client.src`): `export func render(n) { set_html(view(n)) }` — the
-same `view()`, exported from wasm, so a click re-renders in the browser with no
-round-trip and produces the exact markup the server sent.
+**Client** (`client.src`): the same `view()`, plus the interaction state held in
+machin — a package global (`var count = 0`, v0.52.0). On hydration the page
+**seeds** it with the server's count, then each click calls `bump(d)`, which
+mutates the global and repaints with the shared `view()` — byte-identical to what
+the server sent. JS holds no state; the component owns it.
 
 ## Why this matters
 
@@ -93,10 +95,12 @@ return ok_html(page(qn(req.path)))
 
 ## What's next
 
-The component still keeps no state of its own (the count lives in the URL / the
-JS host). The next steps toward a real **reactive framework in MFL**: package-level
-state so a component owns its state in machin, then signals + a patch-list runtime.
-See the [web north star](https://github.com/javimosch/machin/blob/main/docs/NORTH-STAR-WEB.md).
+The component now owns its state in machin (a package global, v0.52.0) and the
+single binary serves its own wasm. The next step toward a real **reactive
+framework in MFL**: **signals + a patch-list runtime** — derived views that
+recompute only what changed, and a diff the JS host applies, instead of replacing
+`innerHTML` wholesale. See the
+[web north star](https://github.com/javimosch/machin/blob/main/docs/NORTH-STAR-WEB.md).
 
 ## License
 
